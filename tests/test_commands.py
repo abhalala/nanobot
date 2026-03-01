@@ -128,3 +128,102 @@ def test_litellm_provider_canonicalizes_github_copilot_hyphen_prefix():
 def test_openai_codex_strip_prefix_supports_hyphen_and_underscore():
     assert _strip_model_prefix("openai-codex/gpt-5.1-codex") == "gpt-5.1-codex"
     assert _strip_model_prefix("openai_codex/gpt-5.1-codex") == "gpt-5.1-codex"
+
+
+# ============================================================================
+# provider set-key
+# ============================================================================
+
+
+@pytest.fixture
+def config_paths(tmp_path):
+    """Fixture that wires load_config/save_config/get_config_path to a temp dir."""
+    config_file = tmp_path / "config.json"
+    saved: list[Config] = []
+
+    def _load(_path=None):
+        return Config()
+
+    def _save(cfg, _path=None):
+        saved.append(cfg)
+        config_file.write_text("{}")
+
+    with patch("nanobot.config.loader.load_config", side_effect=_load), \
+         patch("nanobot.config.loader.save_config", side_effect=_save), \
+         patch("nanobot.config.loader.get_config_path", return_value=config_file):
+        yield config_file, saved
+
+
+def test_provider_set_key_kilo(config_paths):
+    """set-key stores the API key for the kilo provider."""
+    config_file, saved = config_paths
+
+    result = runner.invoke(app, ["provider", "set-key", "kilo", "sk-kilo-test"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "Kilo.ai" in result.stdout
+    assert len(saved) == 1
+    assert saved[0].providers.kilo.api_key == "sk-kilo-test"
+
+
+def test_provider_set_key_with_api_base(config_paths):
+    """set-key stores both API key and custom base URL."""
+    config_file, saved = config_paths
+
+    result = runner.invoke(
+        app,
+        ["provider", "set-key", "kilo", "sk-kilo-test", "--api-base", "https://custom.kilo.ai/v1"],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert saved[0].providers.kilo.api_key == "sk-kilo-test"
+    assert saved[0].providers.kilo.api_base == "https://custom.kilo.ai/v1"
+
+
+def test_provider_set_key_unknown_provider(config_paths):
+    """set-key exits with error for unknown provider names."""
+    result = runner.invoke(app, ["provider", "set-key", "nonexistent", "some-key"])
+
+    assert result.exit_code != 0
+
+
+def test_provider_set_key_oauth_provider_rejected(config_paths):
+    """set-key rejects OAuth-only providers with a helpful message."""
+    result = runner.invoke(app, ["provider", "set-key", "openai-codex", "some-key"])
+
+    assert result.exit_code != 0
+    assert "OAuth" in result.stdout or "login" in result.stdout
+
+
+# ============================================================================
+# provider use
+# ============================================================================
+
+
+def test_provider_use_kilo(config_paths):
+    """use switches the active provider to kilo."""
+    config_file, saved = config_paths
+
+    result = runner.invoke(app, ["provider", "use", "kilo"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "Kilo.ai" in result.stdout
+    assert saved[0].agents.defaults.provider == "kilo"
+
+
+def test_provider_use_with_model(config_paths):
+    """use sets both provider and model when --model is supplied."""
+    config_file, saved = config_paths
+
+    result = runner.invoke(app, ["provider", "use", "kilo", "--model", "claude-opus-4-5"])
+
+    assert result.exit_code == 0, result.stdout
+    assert saved[0].agents.defaults.provider == "kilo"
+    assert saved[0].agents.defaults.model == "claude-opus-4-5"
+
+
+def test_provider_use_unknown_provider(config_paths):
+    """use exits with error for unknown provider names."""
+    result = runner.invoke(app, ["provider", "use", "nonexistent"])
+
+    assert result.exit_code != 0
