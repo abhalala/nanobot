@@ -123,6 +123,26 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         model_overrides=(),
     ),
 
+    # Kilo.ai: OpenAI-compatible API gateway, routes any model.
+    # strip_model_prefix=True: strip provider prefix (e.g. "anthropic/claude-3" → "claude-3")
+    # before re-prefixing as "openai/claude-3" for LiteLLM routing.
+    ProviderSpec(
+        name="kilo",
+        keywords=("kilo",),
+        env_key="OPENAI_API_KEY",           # OpenAI-compatible
+        display_name="Kilo.ai",
+        litellm_prefix="openai",            # → openai/{model}
+        skip_prefixes=(),
+        env_extras=(),
+        is_gateway=True,
+        is_local=False,
+        detect_by_key_prefix="",
+        detect_by_base_keyword="kilo.ai",
+        default_api_base="https://api.kilo.ai/v1",
+        strip_model_prefix=True,            # anthropic/claude-3 → claude-3 → openai/claude-3
+        model_overrides=(),
+    ),
+
     # SiliconFlow (硅基流动): OpenAI-compatible gateway, model names keep org prefix
     ProviderSpec(
         name="siliconflow",

@@ -189,9 +189,10 @@ def onboard():
 
     console.print(f"\n{__logo__} nanobot is ready!")
     console.print("\nNext steps:")
-    console.print("  1. Add your API key to [cyan]~/.nanobot/config.json[/cyan]")
-    console.print("     Get one at: https://openrouter.ai/keys")
-    console.print("  2. Chat: [cyan]nanobot agent -m \"Hello!\"[/cyan]")
+    console.print("  1. Set your API key:  [cyan]nanobot provider set-key kilo <your-key>[/cyan]")
+    console.print("     Get one at: https://kilo.ai  or  https://openrouter.ai/keys")
+    console.print("  2. (Optional) Switch provider:  [cyan]nanobot provider use kilo --model <model-name>[/cyan]")
+    console.print("  3. Chat: [cyan]nanobot agent -m \"Hello!\"[/cyan]")
     console.print("\n[dim]Want Telegram/WhatsApp? See: https://github.com/HKUDS/nanobot#-chat-apps[/dim]")
 
 
@@ -1015,11 +1016,77 @@ def status():
 
 
 # ============================================================================
-# OAuth Login
+# Provider Management
 # ============================================================================
 
 provider_app = typer.Typer(help="Manage providers")
 app.add_typer(provider_app, name="provider")
+
+
+@provider_app.command("set-key")
+def provider_set_key(
+    provider: str = typer.Argument(..., help="Provider name (e.g. 'kilo', 'openrouter')"),
+    api_key: str = typer.Argument(..., help="API key to store for this provider"),
+    api_base: str = typer.Option(None, "--api-base", "-b", help="Optional custom API base URL"),
+):
+    """Set the API key (and optionally base URL) for a provider."""
+    from nanobot.config.loader import get_config_path, load_config, save_config
+    from nanobot.providers.registry import PROVIDERS
+
+    key = provider.replace("-", "_")
+    spec = next((s for s in PROVIDERS if s.name == key), None)
+    if not spec:
+        # Only show key-based providers in the hint; OAuth/local use different commands
+        names = ", ".join(s.name for s in PROVIDERS if not s.is_oauth and not s.is_local)
+        console.print(f"[red]Unknown provider: {provider}[/red]  Known: {names}")
+        raise typer.Exit(1)
+
+    if spec.is_oauth:
+        console.print(f"[yellow]{spec.display_name} uses OAuth — run:[/yellow]  nanobot provider login {provider}")
+        raise typer.Exit(1)
+
+    config = load_config()
+    p = getattr(config.providers, spec.name, None)
+    if p is None:
+        console.print(f"[red]Provider field missing in schema: {spec.name}[/red]")
+        raise typer.Exit(1)
+
+    p.api_key = api_key
+    if api_base:
+        p.api_base = api_base
+
+    save_config(config)
+    console.print(f"[green]✓[/green] API key saved for [cyan]{spec.display_name}[/cyan] in {get_config_path()}")
+    if api_base:
+        console.print(f"  API base: {api_base}")
+
+
+@provider_app.command("use")
+def provider_use(
+    provider: str = typer.Argument(..., help="Provider name (e.g. 'kilo', 'openrouter')"),
+    model: str = typer.Option(None, "--model", "-m", help="Model to use (e.g. 'claude-opus-4-5')"),
+):
+    """Set the active provider (and optionally model) in config."""
+    from nanobot.config.loader import get_config_path, load_config, save_config
+    from nanobot.providers.registry import PROVIDERS
+
+    key = provider.replace("-", "_")
+    spec = next((s for s in PROVIDERS if s.name == key), None)
+    if not spec:
+        names = ", ".join(s.name for s in PROVIDERS)
+        console.print(f"[red]Unknown provider: {provider}[/red]  Known: {names}")
+        raise typer.Exit(1)
+
+    config = load_config()
+    config.agents.defaults.provider = spec.name  # type: ignore[assignment]
+    if model:
+        config.agents.defaults.model = model
+
+    save_config(config)
+    model_info = f" with model [cyan]{model}[/cyan]" if model else ""
+    console.print(
+        f"[green]✓[/green] Active provider set to [cyan]{spec.display_name}[/cyan]{model_info} in {get_config_path()}"
+    )
 
 
 _LOGIN_HANDLERS: dict[str, callable] = {}

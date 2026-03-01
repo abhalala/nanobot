@@ -119,7 +119,7 @@ pip install nanobot-ai
 
 > [!TIP]
 > Set your API key in `~/.nanobot/config.json`.
-> Get API keys: [OpenRouter](https://openrouter.ai/keys) (Global) · [Brave Search](https://brave.com/search/api/) (optional, for web search)
+> Get API keys: [OpenRouter](https://openrouter.ai/keys) (Global) · [Kilo.ai](https://kilo.ai) (Global) · [Brave Search](https://brave.com/search/api/) (optional, for web search)
 
 **1. Initialize**
 
@@ -127,28 +127,32 @@ pip install nanobot-ai
 nanobot onboard
 ```
 
-**2. Configure** (`~/.nanobot/config.json`)
+**2. Configure**
 
-Add or merge these **two parts** into your config (other options have defaults).
+The fastest way is via the CLI (works for any API key provider):
 
-*Set your API key* (e.g. OpenRouter, recommended for global users):
+```bash
+# Set your API key (e.g. Kilo.ai or OpenRouter)
+nanobot provider set-key kilo sk-kilo-xxx
+nanobot provider set-key openrouter sk-or-v1-xxx
+
+# Switch active provider and model
+nanobot provider use kilo --model anthropic/claude-opus-4-5
+```
+
+Or edit `~/.nanobot/config.json` directly:
+
 ```json
 {
   "providers": {
-    "openrouter": {
-      "apiKey": "sk-or-v1-xxx"
+    "kilo": {
+      "apiKey": "sk-kilo-xxx"
     }
-  }
-}
-```
-
-*Set your model* (optionally pin a provider — defaults to auto-detection):
-```json
-{
+  },
   "agents": {
     "defaults": {
       "model": "anthropic/claude-opus-4-5",
-      "provider": "openrouter"
+      "provider": "kilo"
     }
   }
 }
@@ -662,6 +666,7 @@ Config file: `~/.nanobot/config.json`
 |----------|---------|-------------|
 | `custom` | Any OpenAI-compatible endpoint (direct, no LiteLLM) | — |
 | `openrouter` | LLM (recommended, access to all models) | [openrouter.ai](https://openrouter.ai) |
+| `kilo` | LLM (API gateway, access to all models) | [kilo.ai](https://kilo.ai) |
 | `anthropic` | LLM (Claude direct) | [console.anthropic.com](https://console.anthropic.com) |
 | `openai` | LLM (GPT direct) | [platform.openai.com](https://platform.openai.com) |
 | `deepseek` | LLM (DeepSeek direct) | [platform.deepseek.com](https://platform.deepseek.com) |
@@ -893,6 +898,8 @@ MCP tools are automatically discovered and registered on startup. The LLM can us
 | `nanobot agent --logs` | Show runtime logs during chat |
 | `nanobot gateway` | Start the gateway |
 | `nanobot status` | Show status |
+| `nanobot provider set-key <provider> <key>` | Set an API key for a provider |
+| `nanobot provider use <provider> [--model <model>]` | Switch active provider/model |
 | `nanobot provider login openai-codex` | OAuth login for providers |
 | `nanobot channels login` | Link WhatsApp (scan QR) |
 | `nanobot channels status` | Show channel status |
